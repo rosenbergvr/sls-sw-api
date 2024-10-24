@@ -1,0 +1,90 @@
+# "org" ensures this Service is used with the correct Serverless Framework Access Key.
+org: aynitech
+# "app" enables Serverless Framework Dashboard features and sharing them with other Services.
+app: sls-sw-api
+# "service" is the name of this project. This will also be added to your AWS resource names.
+service: sls-sw-api
+
+stages:
+  default:
+    params:
+      tableName: "users-table-${sls:stage}"
+    resolver:
+      shared-account:
+        type: aws
+        region: us-east-1
+  prod:
+    params:
+      tableName: "users-table-${sls:stage}"
+      key1: prodValue
+      IS_OFFLINE: false
+provider:
+  name: aws
+  runtime: nodejs20.x
+  region: us-east-1
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+          Resource:
+            - Fn::GetAtt: [UsersTable, Arn]
+  environment:
+    USERS_TABLE: ${param:tableName}
+
+functions:
+  api:
+    handler: handler.handler
+    events:
+      - httpApi: "*"
+  usersGet:
+    handler: getUsers/handler.getUsers
+    events:
+      - httpApi: "GET /users/"
+  usersCreate:
+    handler: createUsers/handler.createUsers
+    events:
+      -httpApi: "POST /users/create"
+  usersDelete:
+    handler: deleteUsers/handler.deleteUsers
+    events:
+      -httpApi: "POST /users/delete"
+  swPlanet:
+    handler: swPlanet/handler.swPlanet
+    events:
+      -httpApi: "GET /sw/planet"
+  # get-users:
+  #   handler: getUsers/handler.getUsers
+  #   package:
+  #     patterns:
+  #       - "getUsers/handler.js"
+  #   events:
+  #     - http:
+  #       path: users/{id}
+  #       method: GET
+  #       request:
+  #         parameters:
+  #           paths:
+  #             id: true
+resources:
+  Resources:
+    UsersTable:
+      Type: AWS::DynamoDB::Table
+      Properties:      
+        TableName: ${param:tableName}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: userId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: userId
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
